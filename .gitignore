@@ -1,0 +1,29 @@
+# Python
+
+**pycache**/
+*.py[cod]
+*.pyo
+
+# Virtual Environment
+
+venv/
+.venv/
+
+# Pytest
+
+.pytest_cache/
+
+# VS Code
+
+.vscode/
+
+# Environment Files
+
+.env
+
+# OS Files
+
+.DS_Store
+Thumbs.db
+
+Project Beta Project Spec.pdf
