@@ -27,5 +27,9 @@ class ChatResponse(BaseModel):
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(payload: ChatRequest) -> ChatResponse:
+    print(f"business_id={payload.business_id}")
+    print(f"mode={payload.mode}")
+    print(f"message={payload.message}")
+
     # Day 1 stub response to lock the API contract before agent/tool integration.
     return ChatResponse(reply_text="Stub response: chat contract is active.", attachments=[])

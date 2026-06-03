@@ -4,6 +4,8 @@ import "./App.css";
 function App() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
+  const [businessId, setBusinessId] = useState("demo-business");
+  const [mode, setMode] = useState("owner");
 
   const handleSend = async () => {
     if (!message.trim()) return;
@@ -27,8 +29,8 @@ function App() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          business_id: "demo-business",
-          mode: "owner",
+          business_id: businessId,
+          mode: mode,
           message: userMessage,
         }),
       });
@@ -59,6 +61,31 @@ function App() {
     <div className="chat-page">
       <div className="chat-shell">
         <h1 className="chat-title">Bill-on-Chat</h1>
+
+        <div className="chat-controls">
+          <div className="chat-control-group">
+            <label className="chat-control-label" htmlFor="business-id">Business ID</label>
+            <input
+              id="business-id"
+              className="chat-control-input"
+              type="text"
+              value={businessId}
+              onChange={(e) => setBusinessId(e.target.value)}
+            />
+          </div>
+          <div className="chat-control-group">
+            <label className="chat-control-label" htmlFor="mode">Mode</label>
+            <select
+              id="mode"
+              className="chat-control-select"
+              value={mode}
+              onChange={(e) => setMode(e.target.value)}
+            >
+              <option value="owner">owner</option>
+              <option value="customer">customer</option>
+            </select>
+          </div>
+        </div>
 
         <div className="chat-messages" role="log" aria-live="polite">
           {messages.map((msg, index) => (
