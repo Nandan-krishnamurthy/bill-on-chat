@@ -3,6 +3,8 @@ from typing import Literal
 from fastapi import APIRouter
 from pydantic import BaseModel, Field, field_validator
 
+from app.llm import get_llm_provider
+
 
 router = APIRouter()
 
@@ -31,5 +33,7 @@ async def chat_endpoint(payload: ChatRequest) -> ChatResponse:
     print(f"mode={payload.mode}")
     print(f"message={payload.message}")
 
-    # Day 1 stub response to lock the API contract before agent/tool integration.
-    return ChatResponse(reply_text="Stub response: chat contract is active.", attachments=[])
+    provider = get_llm_provider()
+    reply_text = provider.generate(payload.message)
+
+    return ChatResponse(reply_text=reply_text, attachments=[])
