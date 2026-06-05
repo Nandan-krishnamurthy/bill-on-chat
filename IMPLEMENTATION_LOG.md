@@ -213,3 +213,77 @@ No models, tables, or business entities exist yet.
 ### Next Step
 
 Begin first database-backed application structures according to schedule.
+
+
+# Week 2 Day 6 - Database Schema Baseline
+
+## Objective
+
+Establish the initial PostgreSQL schema for Project Beta and verify a stable, reversible migration workflow.
+
+## Completed
+
+### Database Models
+
+Created modular SQLAlchemy model package:
+
+* Business
+* Customer
+* Product
+
+Implemented tenant-aware schema design using `business_id` scoping on customer and product records.
+
+### Schema
+
+Created initial tables:
+
+* businesses
+* customers
+* products
+
+Key requirements implemented:
+
+* `businesses.whatsapp_number` remains nullable (Phase 1 requirement)
+* Foreign key relationships from customers/products to businesses
+* Indexed `business_id` fields for tenant isolation
+
+### Alembic
+
+Configured Alembic to:
+
+* Load `DATABASE_URL` from `.env`
+* Discover `Base.metadata`
+* Autogenerate migrations from ORM models
+
+Added synchronous PostgreSQL migration support for Alembic.
+
+### Migration Validation
+
+Generated initial migration:
+
+* Revision: `39350b3c6e6f`
+* Message: `initial schema`
+
+Verified full migration lifecycle:
+
+1. `alembic upgrade head`
+2. `alembic downgrade base`
+3. `alembic upgrade head`
+
+All operations completed successfully.
+
+### Verification
+
+Confirmed:
+
+* Migration file generated correctly
+* Foreign keys created correctly
+* Nullable constraints preserved
+* Database connection test passes
+* Current Alembic revision: `39350b3c6e6f (head)`
+
+## Result
+
+Day 6 Definition of Done achieved.
+
+The database foundation is now in place with a stable, reversible schema baseline ready for Customer Agent development in the next milestone.
