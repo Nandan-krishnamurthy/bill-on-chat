@@ -141,3 +141,75 @@ LLM_PROVIDER=stub
 ✅ Week 1 Day 4 complete.
 ✅ Provider switching validated.
 ✅ Chat endpoint functioning through factory layer.
+
+
+
+## Week 2 Day 5 - Database Foundation
+
+### Completed
+
+* Installed PostgreSQL 18 locally.
+* Created database: `bill_on_chat`.
+* Installed:
+
+  * SQLAlchemy
+  * asyncpg
+  * Alembic
+  * python-dotenv
+* Added `DATABASE_URL` configuration.
+* Created:
+
+  * `app/db/session.py`
+  * `app/db/__init__.py`
+* Configured:
+
+  * Async SQLAlchemy engine
+  * Async sessionmaker
+* Initialized Alembic:
+
+  * `alembic/`
+  * `alembic.ini`
+
+### Verification
+
+* Database connection test passed.
+
+Output:
+
+```text
+Database connection successful
+1
+```
+
+### Current Architecture
+
+Frontend
+↓
+FastAPI
+↓
+Provider Factory
+↓
+Stub Provider
+
+Database Layer
+
+FastAPI
+↓
+SQLAlchemy Async Engine
+↓
+PostgreSQL
+
+### Notes
+
+* Fixed VS Code interpreter issue.
+* Added `.env` loading via `python-dotenv`.
+
+### Current State
+
+Project now has a working PostgreSQL connection and migration framework.
+
+No models, tables, or business entities exist yet.
+
+### Next Step
+
+Begin first database-backed application structures according to schedule.
