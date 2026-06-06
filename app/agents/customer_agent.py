@@ -4,7 +4,10 @@ from app.schemas.customer import CustomerCreate
 from app.tools.customer_tools import create_customer
 
 
-async def handle_customer_request(message: str):
+async def handle_customer_request(
+    message: str,
+    business_id: int,
+ ):
     """
     Example:
     Add customer Ramesh 9876543210
@@ -26,7 +29,7 @@ async def handle_customer_request(message: str):
     phone = match.group(2)
 
     customer = CustomerCreate(
-        business_id=1,  # temporary hardcoded value for Day 7
+        business_id=business_id,  
         name=name,
         phone=phone,
         state="Karnataka",

@@ -2,7 +2,7 @@ from typing import Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field, field_validator
-
+from app.agents.orchestrator import route_message
 from app.llm import get_llm_provider
 
 
@@ -33,7 +33,23 @@ async def chat_endpoint(payload: ChatRequest) -> ChatResponse:
     print(f"mode={payload.mode}")
     print(f"message={payload.message}")
 
-    provider = get_llm_provider()
-    reply_text = provider.generate(payload.message)
+    result = await route_message(
+        payload.message,
+        int(payload.business_id),
+    )
 
-    return ChatResponse(reply_text=reply_text, attachments=[])
+    if result.get("success"):
+        reply_text = result.get(
+            "message",
+            "Customer created successfully",
+        )
+    else:
+        reply_text = result.get(
+            "message",
+            "Request failed",
+        )
+
+    return ChatResponse(
+        reply_text=reply_text,
+        attachments=[],
+    )

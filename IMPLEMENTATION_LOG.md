@@ -312,3 +312,25 @@ Day 7 Complete
 
 Carry Forward:
 - Add database-backed duplicate customer integration test when test database fixtures are introduced.
+
+## Week 2 Day 8 Completed
+
+Implemented:
+
+* Wired `/chat` endpoint to orchestrator.
+* Added owner intent mapping (`add customer` → Customer Agent).
+* Passed `business_id` through chat → orchestrator → customer agent → customer tool.
+* Removed hardcoded `business_id` from Customer Agent.
+
+Testing:
+
+* End-to-end customer creation verified via Swagger and React frontend.
+* Customer successfully persisted to PostgreSQL.
+* Tenant isolation verified using multiple businesses.
+* Foreign key validation confirmed by creating valid business records.
+
+Result:
+Natural language customer creation now works end-to-end with tenant isolation.
+
+Flow:
+Frontend → `/chat` → Orchestrator → Customer Agent → Customer Tool → PostgreSQL
