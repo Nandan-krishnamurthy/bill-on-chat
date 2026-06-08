@@ -334,3 +334,23 @@ Natural language customer creation now works end-to-end with tenant isolation.
 
 Flow:
 Frontend → `/chat` → Orchestrator → Customer Agent → Customer Tool → PostgreSQL
+
+## Week 2 Day 9 Completed
+
+## Week 2 Day 9
+
+Completed:
+- Added GET /businesses endpoint.
+- Added business selector dropdown in frontend.
+- Removed manual business ID entry.
+- Verified tenant isolation.
+- Verified duplicate customer handling.
+- Verified customer creation flow.
+- Created clean database (bill_on_chat_checkpoint).
+- Successfully ran alembic upgrade head on clean database.
+- Verified businesses, customers, products tables created.
+- Recovery test passed.
+
+Status:
+Week 2 checkpoint complete.
+System is stable, testable, and recoverable.

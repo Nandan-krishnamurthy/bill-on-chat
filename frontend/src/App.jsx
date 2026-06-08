@@ -1,15 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./App.css";
 
 function App() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
-  const [businessId, setBusinessId] = useState("demo-business");
+  const [businessId, setBusinessId] = useState("");
   const [mode, setMode] = useState("owner");
+  const [businesses, setBusinesses] = useState([]);
+
+  useEffect(() => {
+    const fetchBusinesses = async () => {
+      try {
+        const response = await fetch("http://127.0.0.1:8000/businesses");
+        const data = await response.json();
+        setBusinesses(data);
+        
+      } catch (error) {
+        console.error("Failed to fetch businesses:", error);
+      }
+    };
+
+    fetchBusinesses();
+  }, []);
 
   const handleSend = async () => {
     if (!message.trim()) return;
-
+    if (!businessId) {
+      alert("Please select a business");
+      return;
+    }
     const userMessage = message;
 
     setMessages((prev) => [
@@ -65,13 +84,19 @@ function App() {
         <div className="chat-controls">
           <div className="chat-control-group">
             <label className="chat-control-label" htmlFor="business-id">Business ID</label>
-            <input
+            <select
               id="business-id"
-              className="chat-control-input"
-              type="text"
+              className="chat-control-select"
               value={businessId}
               onChange={(e) => setBusinessId(e.target.value)}
-            />
+            >
+              <option value="">Select a business</option>
+              {businesses.map((business) => (
+                <option key={business.id} value={business.id}>
+                  {business.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="chat-control-group">
             <label className="chat-control-label" htmlFor="mode">Mode</label>
