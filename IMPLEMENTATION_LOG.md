@@ -354,3 +354,22 @@ Completed:
 Status:
 Week 2 checkpoint complete.
 System is stable, testable, and recoverable.
+
+
+
+## Week 3 Day 10 Completed
+
+- Extended Product model with low_stock_threshold field.
+- Generated and applied Alembic migration.
+- Updated Product schema and database layer.
+- Created ProductCreate schema.
+- Created ProductUpdate schema.
+- Added validation rules for:
+  - sell_price
+  - gst_rate
+  - stock
+  - low_stock_threshold
+- Added product schema validation tests.
+- Verified migration applied successfully.
+- Verified Product schema tests pass (5/5).
+- Product data layer complete and reversible.
