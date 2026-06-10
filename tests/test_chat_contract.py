@@ -6,9 +6,9 @@ from app.main import app
 client = TestClient(app)
 
 
-def test_chat_valid_payload_returns_stub_response() -> None:
+def test_chat_valid_payload_returns_response_contract() -> None:
     payload = {
-        "business_id": "demo-business",
+        "business_id": "1",
         "mode": "owner",
         "message": "Hello",
     }
@@ -16,15 +16,18 @@ def test_chat_valid_payload_returns_stub_response() -> None:
     response = client.post("/chat", json=payload)
 
     assert response.status_code == 200
-    assert response.json() == {
-        "reply_text": "Stub response: chat contract is active.",
-        "attachments": [],
-    }
+
+    data = response.json()
+
+    assert "reply_text" in data
+    assert "attachments" in data
+    assert isinstance(data["reply_text"], str)
+    assert isinstance(data["attachments"], list)
 
 
 def test_chat_invalid_mode_returns_422() -> None:
     payload = {
-        "business_id": "demo-business",
+        "business_id": "1",
         "mode": "admin",
         "message": "Hello",
     }
@@ -36,7 +39,7 @@ def test_chat_invalid_mode_returns_422() -> None:
 
 def test_chat_missing_message_returns_422() -> None:
     payload = {
-        "business_id": "demo-business",
+        "business_id": "1",
         "mode": "owner",
     }
 
