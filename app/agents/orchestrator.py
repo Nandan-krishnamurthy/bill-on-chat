@@ -5,6 +5,7 @@ from app.agents.product_agent import handle_product_request
 async def route_message(
     message: str,
     business_id: int,
+    state: dict,
 ):
     """
     Route incoming owner-mode messages
@@ -22,10 +23,12 @@ async def route_message(
     if (
         "add product" in message_lower
         or "update product" in message_lower
+        or "update stock" in message_lower
     ):
         return await handle_product_request(
             message,
             business_id,
+            state,
         )
 
     return {

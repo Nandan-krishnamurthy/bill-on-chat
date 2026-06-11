@@ -9,6 +9,7 @@ client = TestClient(app)
 def test_chat_valid_payload_returns_response_contract() -> None:
     payload = {
         "business_id": "1",
+        "session_id": "test-session",
         "mode": "owner",
         "message": "Hello",
     }
@@ -28,6 +29,7 @@ def test_chat_valid_payload_returns_response_contract() -> None:
 def test_chat_invalid_mode_returns_422() -> None:
     payload = {
         "business_id": "1",
+        "session_id": "test-session",
         "mode": "admin",
         "message": "Hello",
     }
@@ -40,6 +42,7 @@ def test_chat_invalid_mode_returns_422() -> None:
 def test_chat_missing_message_returns_422() -> None:
     payload = {
         "business_id": "1",
+        "session_id": "test-session",
         "mode": "owner",
     }
 
@@ -51,6 +54,7 @@ def test_chat_missing_message_returns_422() -> None:
 def test_chat_blank_business_id_returns_422() -> None:
     payload = {
         "business_id": "   ",
+        "session_id": "test-session",
         "mode": "customer",
         "message": "Need pricing",
     }

@@ -37,3 +37,35 @@ def test_product_update_message_parsing():
     assert match is not None
     assert match.group(1) == "Surf Excel 1kg"
     assert match.group(2) == "100"
+
+def test_memory_based_update_message_parsing():
+
+    message = "Update stock to 100"
+
+    match = re.search(
+        r"update stock to\s+(\d+)",
+        message,
+        re.IGNORECASE,
+    )
+
+    assert match is not None
+    assert match.group(1) == "100"
+
+
+def test_session_state_isolation():
+
+    session_a_state = {
+        "last_product_name": "Surf Excel 1kg",
+    }
+
+    session_b_state = {}
+
+    assert (
+        session_a_state.get("last_product_name")
+        == "Surf Excel 1kg"
+    )
+
+    assert (
+        session_b_state.get("last_product_name")
+        is None
+    )

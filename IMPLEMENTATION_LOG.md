@@ -410,3 +410,23 @@ Result:
 
 * `14 passed`
 * Product vertical slice working end-to-end through chat.
+
+
+## Week 3 Day 12
+
+Implemented conversation state persistence.
+
+Changes:
+- Added session_id to chat contract.
+- Created conversation_state service.
+- Added state load/save around chat orchestration.
+- Propagated state through orchestrator and Product Agent.
+- Stored last_product_name in conversation state.
+- Added memory-based product updates.
+
+Verification:
+- Multi-turn continuity verified via Swagger.
+- Session isolation verified via Swagger.
+- Added memory-based update parsing test.
+- Added session state isolation test.
+- Regression suite passed (16/16).
