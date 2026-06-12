@@ -49,6 +49,7 @@ function App() {
         },
         body: JSON.stringify({
           business_id: businessId,
+          session_id: "test-session",
           mode: mode,
           message: userMessage,
         }),

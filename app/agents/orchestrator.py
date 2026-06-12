@@ -12,6 +12,14 @@ async def route_message(
     to the appropriate specialist agent.
     """
 
+    # Day 13: Handle candidate selection without intent keywords
+    if state.get("awaiting_product_selection"):
+        return await handle_product_request(
+            message,
+            business_id,
+            state,
+        )
+
     message_lower = message.lower()
 
     if "add customer" in message_lower:
