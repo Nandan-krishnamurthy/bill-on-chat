@@ -3,10 +3,6 @@ from typing import Literal
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field, field_validator
 from app.agents.orchestrator import route_message
-from app.services.conversation_state import (
-    load_state,
-    save_state,
-)
 
 router = APIRouter()
 
@@ -36,11 +32,8 @@ async def chat_endpoint(request: Request, payload: ChatRequest) -> ChatResponse:
     print(f"mode={payload.mode}")
     print(f"message={payload.message}")
 
-    # Day 12 - Load conversation state (dual persistence for safety)
-    state = load_state(
-        int(payload.business_id),
-        payload.session_id,
-    )
+    # Phase 3A: Removed load_state() - state now loaded from PostgreSQL checkpoints by graph.ainvoke()
+    # Phase 3A: Removed save_state() - state now saved to PostgreSQL by AsyncPostgresSaver automatically
 
     # Construct thread_id for checkpointer
     thread_id = f"{payload.business_id}:{payload.session_id}"
@@ -54,14 +47,6 @@ async def chat_endpoint(request: Request, payload: ChatRequest) -> ChatResponse:
         payload.session_id,
         thread_id,
         graph,
-        state,
-    )
-
-    # Day 12 - Save conversation state
-    save_state(
-        int(payload.business_id),
-        payload.session_id,
-        state,
     )
 
     if result.get("success"):

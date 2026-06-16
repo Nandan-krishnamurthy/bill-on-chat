@@ -222,10 +222,8 @@ async def route_message(
     session_id: str,
     thread_id: str,
     graph,
-    state: dict,
 ) -> dict:
-    """
-    Route message through LangGraph orchestrator.
+    """Route message through LangGraph orchestrator.
     
     Input:
         message: User message
@@ -233,33 +231,30 @@ async def route_message(
         session_id: Session ID (for state tracking)
         thread_id: Thread ID for checkpointer (business_id:session_id)
         graph: Compiled LangGraph (from app.state.orchestrator_graph)
-        state: Conversation state dict (modified in-place)
     
     Output:
         Agent result dict (with "success" and "message" keys)
     
-    Side effects:
-        Modifies state dict in-place with updated fields:
-        - last_product_name
-        - awaiting_product_selection
-        - pending_candidates
-        - pending_stock
-    
     Note:
+        Phase 3A: Removed state parameter. State is now loaded from PostgreSQL checkpoints
+        by graph.ainvoke() automatically. No need for conversation_state.py dual persistence.
+        
         Graph and thread_id are passed by caller (main.py prepared them in startup).
         This keeps route_message testable and flexible.
     """
     # Convert dict → AgentState
+    # Phase 3A: Initial values don't matter - graph.ainvoke() with thread_id will load
+    # state from PostgreSQL checkpoints and override these defaults
     agent_state: AgentState = {
         "messages": [HumanMessage(content=message)],
         "mode": "owner",  # Phase 1: owner mode only
         "business_id": business_id,
         "session_id": session_id,
         "intent": "",
-        "last_product_name": state.get("last_product_name", ""),
-        "awaiting_product_selection": state.get("awaiting_product_selection", False),
-        "pending_candidates": state.get("pending_candidates", []),
-        "pending_stock": state.get("pending_stock", 0),
+        "last_product_name": "",
+        "awaiting_product_selection": False,
+        "pending_candidates": [],
+        "pending_stock": 0,
         "agent_result": {},
     }
     
@@ -273,11 +268,8 @@ async def route_message(
         },
     )
     
-    # Update input state dict with changes (in-place, so it persists in conversation_state.py)
-    state["last_product_name"] = result_state.get("last_product_name", "")
-    state["awaiting_product_selection"] = result_state.get("awaiting_product_selection", False)
-    state["pending_candidates"] = result_state.get("pending_candidates", [])
-    state["pending_stock"] = result_state.get("pending_stock", 0)
+    # Phase 3A: Removed state dict update - no need to update conversation_state.py
+    # State is now persisted to PostgreSQL by AsyncPostgresSaver automatically
     
     # Return agent result (same format as old orchestrator)
     return result_state.get("agent_result", {})
