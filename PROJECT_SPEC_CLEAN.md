@@ -434,7 +434,7 @@ Customers can be created entirely from web chat.
 Goal: products work, and bot remembers context across turns.
 
 16. Build Product Agent similarly to Customer Agent.
-17. Ensure multi-turn slot filling works (price? GST rate? stock?).
+17. Add conversational memory with langGraph's checkpointer on postgres backend so multi-turn slot filling works (price? GST rate? stock?).
 18. Add fuzzy lookup with ILIKE '%name%'; if multiple matches, ask user to disambiguate.
 
 WEEK 3 CHECKPOINT

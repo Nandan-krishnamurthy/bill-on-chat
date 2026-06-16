@@ -1,9 +1,8 @@
 from typing import Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field, field_validator
 from app.agents.orchestrator import route_message
-from app.llm import get_llm_provider
 from app.services.conversation_state import (
     load_state,
     save_state,
@@ -32,20 +31,29 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(payload: ChatRequest) -> ChatResponse:
+async def chat_endpoint(request: Request, payload: ChatRequest) -> ChatResponse:
     print(f"business_id={payload.business_id}")
     print(f"mode={payload.mode}")
     print(f"message={payload.message}")
 
-    # Day 12 - Load conversation state
+    # Day 12 - Load conversation state (dual persistence for safety)
     state = load_state(
         int(payload.business_id),
         payload.session_id,
     )
 
+    # Construct thread_id for checkpointer
+    thread_id = f"{payload.business_id}:{payload.session_id}"
+
+    # Get graph from app.state (compiled during startup)
+    graph = request.app.state.orchestrator_graph
+
     result = await route_message(
         payload.message,
         int(payload.business_id),
+        payload.session_id,
+        thread_id,
+        graph,
         state,
     )
 
