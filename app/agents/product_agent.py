@@ -1,13 +1,16 @@
-import re
+"""
+Product Agent - LLM-driven tool selection with state-based disambiguation.
 
+The LLM understands natural language variations for creating and updating products.
+For updates, if multiple products match, the system asks the user to disambiguate
+using numeric selection (1, 2, 3...).
+"""
+
+import re
 from app.schemas.product import ProductCreate, ProductUpdate
-from app.services.product_matcher import (
-    find_product_candidates,
-)
-from app.tools.product_tools import (
-    create_product,
-    update_product,
-)
+from app.services.product_matcher import find_product_candidates
+from app.tools.product_tools import create_product, update_product
+from app.services.llm_tools import llm_product_intent
 
 
 async def handle_product_request(
@@ -16,35 +19,25 @@ async def handle_product_request(
     state: dict,
 ):
     """
-    Product Agent
-
-    Handles owner-mode product management requests.
-
-    Supported commands:
-
-    Create Product:
-    Add product Surf Excel 1kg HSN 3402 Rs 250 GST 18% 50 in stock
-
-    Update Stock:
-    Update product Surf Excel 1kg stock to 100
-
-    Memory-based Update:
-    Update stock to 100
-
-    Candidate Disambiguation:
-    When multiple products match, user selects by number (1, 2, 3, etc.)
+    Product Agent - LLM-driven tool selection.
+    
+    Examples:
+    - Create: "Add product Surf Excel 1kg HSN 3402 Rs 250 GST 18% 50 in stock"
+    - Create: "I want to add a product: Matic 1kg, HSN 3402, price 300, GST 18%, stock 100"
+    - Update: "Update product Surf stock to 100"
+    - Update: "Set Matic quantity to 250"
+    - Disambiguate: "1" (select first product from list)
     """
 
-    # Day 13: Handle candidate selection
+    # Handle candidate selection (numeric disambiguation)
     if state.get("awaiting_product_selection"):
-        # Check if message is a valid selection number
         selection_match = re.match(r"^\s*(\d+)\s*$", message)
 
         if selection_match:
             selection_num = int(selection_match.group(1))
             candidates = state.get("pending_candidates", [])
 
-            # Validate selection range (1-indexed for user, 0-indexed internally)
+            # Validate selection range
             if selection_num < 1 or selection_num > len(candidates):
                 return {
                     "success": False,
@@ -73,126 +66,155 @@ async def handle_product_request(
             state["pending_stock"] = None
 
             return result
-
-    # Create Product
-    create_match = re.search(
-        r"add product\s+(.+?)\s+hsn\s+(\d{4,8})\s+rs\s+(\d+(?:\.\d+)?)\s+gst\s+(\d{1,2})%\s+(\d+)\s+in stock",
-        message,
-        re.IGNORECASE,
-    )
-
-    if create_match:
-        name = create_match.group(1).strip()
-        state["last_product_name"] = name
-
-        hsn = create_match.group(2)
-        sell_price = float(create_match.group(3))
-        gst_rate = int(create_match.group(4))
-        stock = int(create_match.group(5))
-
-        product = ProductCreate(
-            business_id=business_id,
-            name=name,
-            hsn=hsn,
-            sell_price=sell_price,
-            cost=None,
-            gst_rate=gst_rate,
-            stock=stock,
-            low_stock_threshold=5,
-            unit="pcs",
-        )
-
-        return await create_product(product)
-
-    # Update Product with Fuzzy Lookup
-    update_match = re.search(
-        r"update product\s+(.+?)\s+stock\s+to\s+(\d+)",
-        message,
-        re.IGNORECASE,
-    )
-
-    if update_match:
-        search_term = update_match.group(1).strip()
-        stock = int(update_match.group(2))
-
-        candidates = await find_product_candidates(
-            business_id=business_id,
-            search_term=search_term,
-        )
-
-        if len(candidates) == 0:
+        else:
+            # User sent non-numeric input while awaiting selection
             return {
                 "success": False,
-                "message": f"No product found matching '{search_term}'.",
+                "message": "Please select a product number from the list above.",
             }
 
-        if len(candidates) == 1:
-            product_name = candidates[0].name
+    # Use LLM to understand product intent
+    intent = await llm_product_intent(message, business_id)
 
-            product_update = ProductUpdate(stock=stock)
+    if intent["tool"] == "create_product":
+        params = intent["parameters"]
+        
+        # Validate required fields
+        required = ["name", "hsn", "sell_price", "gst_rate", "stock"]
+        if not all(params.get(f) for f in required):
+            return {
+                "success": False,
+                "message": "To create a product, please provide: name, HSN, price, GST rate, and stock quantity.",
+            }
+        
+        try:
+            # Convert types
+            sell_price = float(params["sell_price"])
+            gst_rate = int(params["gst_rate"])
+            stock = int(params["stock"])
+            
+            # Validate ranges
+            if gst_rate < 0 or gst_rate > 28:
+                return {
+                    "success": False,
+                    "message": "GST rate must be between 0 and 28.",
+                }
+            
+            if stock < 0:
+                return {
+                    "success": False,
+                    "message": "Stock quantity cannot be negative.",
+                }
+            
+            if sell_price < 0:
+                return {
+                    "success": False,
+                    "message": "Price cannot be negative.",
+                }
+            
+            name = params["name"].strip()
+            state["last_product_name"] = name
 
-            result = await update_product(
+            product = ProductCreate(
                 business_id=business_id,
-                product_name=product_name,
-                product_data=product_update,
+                name=name,
+                hsn=params["hsn"].strip(),
+                sell_price=sell_price,
+                cost=None,
+                gst_rate=gst_rate,
+                stock=stock,
+                low_stock_threshold=5,
+                unit="pcs",
             )
 
-            if result["success"]:
-                state["last_product_name"] = product_name
-
-            return result
-
-        # Multiple candidates found: store in state and ask user to select
-        state["awaiting_product_selection"] = True
-        state["pending_candidates"] = [
-            {"name": candidate.name} for candidate in candidates
-        ]
-        state["pending_stock"] = stock
-
-        # Build selection prompt
-        candidate_list = "\n".join(
-            [f"{i + 1}. {candidate.name}" for i, candidate in enumerate(candidates)]
-        )
-
-        return {
-            "success": False,
-            "message": f"Multiple products found matching '{search_term}'.\n\n{candidate_list}\n\nPlease select a product number.",
-        }
-
-    # Memory-based Update (from conversation state)
-    memory_update_match = re.search(
-        r"update stock to\s+(\d+)",
-        message,
-        re.IGNORECASE,
-    )
-
-    if memory_update_match:
-        product_name = state.get("last_product_name")
-
-        if not product_name:
+            return await create_product(product)
+        
+        except (ValueError, TypeError) as e:
             return {
                 "success": False,
-                "message": (
-                    "No recent product found. "
-                    "Please specify the product name."
-                ),
+                "message": f"Invalid product data: {str(e)}",
             }
 
-        stock = int(memory_update_match.group(1))
+    elif intent["tool"] == "update_stock":
+        params = intent["parameters"]
+        
+        # Validate required fields
+        if not params.get("product_name") or "stock" not in params:
+            return {
+                "success": False,
+                "message": "Please specify the product name and new stock quantity.",
+            }
+        
+        try:
+            search_term = params.get("product_name", "").strip()
+            stock = int(params.get("stock", 0))
+            
+            if stock < 0:
+                return {
+                    "success": False,
+                    "message": "Stock quantity cannot be negative.",
+                }
+            
+            # Find matching products
+            candidates = await find_product_candidates(
+                business_id=business_id,
+                search_term=search_term,
+            )
 
-        product_update = ProductUpdate(stock=stock)
+            if len(candidates) == 0:
+                return {
+                    "success": False,
+                    "message": f"No product found matching '{search_term}'.",
+                }
 
-        return await update_product(
-            business_id=business_id,
-            product_name=product_name,
-            product_data=product_update,
-        )
+            if len(candidates) == 1:
+                # Single match - update directly
+                product_name = candidates[0].name
 
-    return {
-        "success": False,
-        "message": (
-            "Invalid product format. "
-            "Example: Add product Surf Excel 1kg "
-            "HSN 3402 Rs 250 GST 18% 50 in stock"
-        ),
-    }
+                product_update = ProductUpdate(stock=stock)
+
+                result = await update_product(
+                    business_id=business_id,
+                    product_name=product_name,
+                    product_data=product_update,
+                )
+
+                if result["success"]:
+                    state["last_product_name"] = product_name
+
+                return result
+
+            # Multiple matches - ask user to disambiguate
+            state["awaiting_product_selection"] = True
+            state["pending_candidates"] = [
+                {"name": candidate.name} for candidate in candidates
+            ]
+            state["pending_stock"] = stock
+
+            # Build selection prompt with proper formatting
+            candidate_list = "\n".join(
+                [f"{i + 1}. {candidate.name}" for i, candidate in enumerate(candidates)]
+            )
+
+            return {
+                "success": False,
+                "message": f"Multiple products found matching '{search_term}'.\n\n{candidate_list}\n\nPlease select a product number.",
+            }
+        
+        except (ValueError, TypeError) as e:
+            return {
+                "success": False,
+                "message": f"Invalid input: {str(e)}",
+            }
+
+    elif intent["tool"] == "unknown":
+        return {
+            "success": False,
+            "message": "I didn't understand that product request. You can create products or update stock.",
+        }
+    
+    else:
+        return {
+            "success": False,
+            "message": "Unknown product operation.",
+        }

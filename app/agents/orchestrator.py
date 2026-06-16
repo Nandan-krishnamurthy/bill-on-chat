@@ -2,13 +2,13 @@
 LangGraph orchestrator (Day 14+).
 
 Replaces hardcoded if/elif routing with LangGraph StateGraph.
-Preserves all Day 13 behavior exactly:
-- Regex-based intent classification
-- State-based routing (awaiting_product_selection takes precedence)
-- Existing handle_customer_request() and handle_product_request() calls
-- Conversation state fields (last_product_name, pending_candidates, etc.)
+Includes state trimming to keep conversation history bounded.
 
-TypedDict for state; backward compatible with dict-based state handling.
+Features:
+- LLM-driven intent classification and tool selection
+- State-based routing (awaiting_product_selection takes precedence)
+- Message archival for bounded checkpoint state
+- Conversation state fields for multi-turn support
 """
 
 from typing import TypedDict, Literal
@@ -17,10 +17,12 @@ from langgraph.graph import StateGraph, START, END
 
 from app.agents.customer_agent import handle_customer_request
 from app.agents.product_agent import handle_product_request
+from app.services.message_archival import archive_old_messages
+from app.services.llm_tools import llm_customer_intent, llm_product_intent
 
 class AgentState(TypedDict, total=False):
     """
-    LangGraph orchestrator state (Day 13 fields preserved).
+    LangGraph orchestrator state (Day 13 fields + Week 3 archival).
     
     TypedDict allows mixed required/optional fields with total=False.
     """
@@ -31,11 +33,14 @@ class AgentState(TypedDict, total=False):
     session_id: str
     intent: str
     
-    # Day 13 state fields (preserved exactly)
+    # Conversation state fields
     last_product_name: str
     awaiting_product_selection: bool
     pending_candidates: list
     pending_stock: int
+    
+    # Week 3: Message archival tracking
+    archived_message_count: int
     
     # Output
     agent_result: dict
@@ -43,22 +48,49 @@ class AgentState(TypedDict, total=False):
 
 async def intent_classifier(state: AgentState) -> AgentState:
     """
-    Classify intent from message (preserving Day 13 regex logic).
+    Classify intent using LLM (Week 3 replacement for regex).
     
-    Regex routing: "add customer", "add product", "update product", "update stock".
-    State-based: awaiting_product_selection takes precedence.
+    Uses Groq-driven intent recognition with fallback to regex for backward compatibility.
+    State-based routing (awaiting_product_selection) takes precedence.
     """
-    # Day 13: State-based routing takes precedence
+    import re
+    
+    # State-based routing takes precedence
     if state.get("awaiting_product_selection", False):
         state["intent"] = "product_selection"
         return state
     
-    # Day 13: Regex-based intent classification
+    # Get message and business_id
     messages = state.get("messages", [])
-    if messages:
-        message = messages[-1].content
-        message_lower = message.lower()
+    business_id = state.get("business_id", 0)
+    
+    if not messages:
+        state["intent"] = "unknown"
+        return state
+    
+    message = messages[-1].content
+    message_lower = message.lower()
+    
+    # Explicit numeric check for product selection disambiguation
+    if re.match(r"^\s*\d+\s*$", message_lower):
+        state["intent"] = "unknown"
+        return state
+    
+    # Use LLM-driven intent classification
+    try:
+        # Try customer intent first
+        customer_result = await llm_customer_intent(message, business_id)
+        if customer_result["tool"] == "create_customer" and customer_result["confidence"] > 0.5:
+            state["intent"] = "create_customer"
+            return state
         
+        # Try product intent
+        product_result = await llm_product_intent(message, business_id)
+        if product_result["tool"] in ["create_product", "update_stock"] and product_result["confidence"] > 0.5:
+            state["intent"] = "update_product"
+            return state
+        
+        # If LLM is uncertain, fall back to regex
         if "add customer" in message_lower:
             state["intent"] = "create_customer"
         elif (
@@ -69,8 +101,19 @@ async def intent_classifier(state: AgentState) -> AgentState:
             state["intent"] = "update_product"
         else:
             state["intent"] = "unknown"
-    else:
-        state["intent"] = "unknown"
+    except Exception as e:
+        # On LLM failure, fall back to regex
+        print(f"LLM classification failed: {e}, using regex fallback")
+        if "add customer" in message_lower:
+            state["intent"] = "create_customer"
+        elif (
+            "add product" in message_lower
+            or "update product" in message_lower
+            or "update stock" in message_lower
+        ):
+            state["intent"] = "update_product"
+        else:
+            state["intent"] = "unknown"
     
     return state
 
@@ -161,6 +204,37 @@ async def fallback_node(state: AgentState) -> AgentState:
     return state
 
 
+async def state_trimming_node(state: AgentState) -> AgentState:
+    """
+    Trim messages to bounded state and archive old messages.
+    
+    Runs after all agent nodes to keep checkpoint state bounded.
+    """
+    messages = state.get("messages", [])
+    business_id = state.get("business_id", 0)
+    session_id = state.get("session_id", "")
+    archived_count = state.get("archived_message_count", 0)
+    
+    if not session_id or not business_id:
+        return state
+    
+    thread_id = f"{business_id}:{session_id}"
+    
+    # Archive old messages if exceeding limit
+    trimmed_messages, new_archived_count = await archive_old_messages(
+        business_id=business_id,
+        session_id=session_id,
+        thread_id=thread_id,
+        messages=messages,
+        archived_message_count=archived_count,
+    )
+    
+    state["messages"] = trimmed_messages
+    state["archived_message_count"] = new_archived_count
+    
+    return state
+
+
 def build_orchestrator_graph(checkpointer):
     """
     Build and compile LangGraph orchestrator.
@@ -171,16 +245,18 @@ def build_orchestrator_graph(checkpointer):
     Returns:
         Compiled LangGraph with checkpointer bound for state persistence.
     
-    Graph structure (Day 13 behavior preserved):
+    Graph structure:
     
     START
       ↓
-    intent_classifier (regex logic)
+    intent_classifier
       ↓
     intent_router (conditional: customer | product | fallback)
       ├→ customer_agent_node
       ├→ product_agent_node
       └→ fallback_node
+      ↓
+    state_trimming_node (archive old messages, keep state bounded)
       ↓
     END
     """
@@ -191,6 +267,7 @@ def build_orchestrator_graph(checkpointer):
     graph.add_node("customer_agent_node", customer_agent_node)
     graph.add_node("product_agent_node", product_agent_node)
     graph.add_node("fallback_node", fallback_node)
+    graph.add_node("state_trimming_node", state_trimming_node)
     
     # Add edges
     graph.add_edge(START, "intent_classifier")
@@ -206,10 +283,13 @@ def build_orchestrator_graph(checkpointer):
         },
     )
     
-    # All agent nodes end
-    graph.add_edge("customer_agent_node", END)
-    graph.add_edge("product_agent_node", END)
-    graph.add_edge("fallback_node", END)
+    # All agent nodes go to state trimming
+    graph.add_edge("customer_agent_node", "state_trimming_node")
+    graph.add_edge("product_agent_node", "state_trimming_node")
+    graph.add_edge("fallback_node", "state_trimming_node")
+    
+    # State trimming goes to end
+    graph.add_edge("state_trimming_node", END)
     
     return graph.compile(
         checkpointer=checkpointer
@@ -236,29 +316,24 @@ async def route_message(
         Agent result dict (with "success" and "message" keys)
     
     Note:
-        Phase 3A: Removed state parameter. State is now loaded from PostgreSQL checkpoints
-        by graph.ainvoke() automatically. No need for conversation_state.py dual persistence.
-        
-        Graph and thread_id are passed by caller (main.py prepared them in startup).
-        This keeps route_message testable and flexible.
+        State Persistence (Phase 3B + Week 3):
+        - graph.ainvoke() with thread_id loads state from PostgreSQL checkpoints
+        - We only provide fields that are always fresh per request (messages, context)
+        - Conversation state fields are loaded from checkpoint
+        - State trimming node archives old messages and keeps checkpoint bounded
     """
-    # Convert dict → AgentState
-    # Phase 3A: Initial values don't matter - graph.ainvoke() with thread_id will load
-    # state from PostgreSQL checkpoints and override these defaults
+    # Only initialize request-specific fields
+    # Conversation state will be loaded from PostgreSQL checkpoint by graph.ainvoke()
     agent_state: AgentState = {
         "messages": [HumanMessage(content=message)],
-        "mode": "owner",  # Phase 1: owner mode only
+        "mode": "owner",
         "business_id": business_id,
         "session_id": session_id,
-        "intent": "",
-        "last_product_name": "",
-        "awaiting_product_selection": False,
-        "pending_candidates": [],
-        "pending_stock": 0,
-        "agent_result": {},
     }
     
     # Invoke graph with correct checkpointer config
+    # LangGraph will merge agent_state with checkpoint state (if exists)
+    # Checkpoint state takes precedence for fields not explicitly provided
     result_state = await graph.ainvoke(
         agent_state,
         config={
@@ -268,8 +343,5 @@ async def route_message(
         },
     )
     
-    # Phase 3A: Removed state dict update - no need to update conversation_state.py
-    # State is now persisted to PostgreSQL by AsyncPostgresSaver automatically
-    
-    # Return agent result (same format as old orchestrator)
+    # Return agent result (saved by last node before END)
     return result_state.get("agent_result", {})

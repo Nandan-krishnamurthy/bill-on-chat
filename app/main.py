@@ -1,7 +1,14 @@
+import sys
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# CRITICAL: Set event loop policy BEFORE any asyncio operations
+# Windows defaults to ProactorEventLoop which psycopg3 doesn't support
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from app.routes.chat import router as chat_router
 from app.routes.business import router as business_router
