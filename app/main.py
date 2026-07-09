@@ -12,6 +12,7 @@ if sys.platform == 'win32':
 
 from app.routes.chat import router as chat_router
 from app.routes.business import router as business_router
+from app.routes.webhook import router as webhook_router
 from app.services.langgraph_checkpointer import get_checkpointer_context_manager
 from app.agents.orchestrator import build_orchestrator_graph
 
@@ -77,3 +78,4 @@ app.add_middleware(
 )
 app.include_router(chat_router)
 app.include_router(business_router)
+app.include_router(webhook_router)
