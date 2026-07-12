@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  bill-on-chat:
+    build: .
+    container_name: bill-on-chat
+
+    ports:
+      - "8000:8000"
+
+    env_file:
+      - .env
+
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:Nandan1025@host.docker.internal:5432/bill_on_chat
