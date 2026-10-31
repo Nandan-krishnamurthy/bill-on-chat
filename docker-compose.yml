@@ -12,4 +12,4 @@ services:
       - .env
 
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:***REMOVED***@host.docker.internal:5432/bill_on_chat
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:5432/bill_on_chat

@@ -27,3 +27,6 @@ venv/
 Thumbs.db
 
 Project Beta Project Spec.pdf
+
+# Private notes - never commit (contains local credentials)
+docs/PROJECT_INTERVIEW_GUIDE.md
